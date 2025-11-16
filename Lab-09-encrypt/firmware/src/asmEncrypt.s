@@ -26,8 +26,8 @@ nameStrPtr: .word nameStr   /* Assign the mem loc of nameStr to nameStrPtr */
 
 .align
  
-@ NOTE: THIS .equ MUST MATCH THE #DEFINE IN main.c !!!!!
-@ TODO: create a .h file that handles both C and assembly syntax for this definition
+/* NOTE: THIS .equ MUST MATCH THE #DEFINE IN main.c !!!!!
+ * TODO: create a .h file that handles both C and assembly syntax for this definition */
 .equ CIPHER_TEXT_LEN, 200
  
 /* space allocated for cipherText: 200 bytes, prefilled with 0x2A */
