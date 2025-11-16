@@ -42,3 +42,5 @@
 *.c~
 /Lab-09-encrypt/firmware/asmEncryptProj.X/build/
 /Lab-09-encrypt/firmware/asmEncryptProj.X/dist/
+*.un~
+*.h~

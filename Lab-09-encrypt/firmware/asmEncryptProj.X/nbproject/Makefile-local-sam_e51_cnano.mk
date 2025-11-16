@@ -34,5 +34,4 @@ MP_CPPC_DIR="C:\Program Files\Microchip\xc32\v4.60\bin"
 MP_AS_DIR="C:\Program Files\Microchip\xc32\v4.60\bin"
 MP_LD_DIR="C:\Program Files\Microchip\xc32\v4.60\bin"
 MP_AR_DIR="C:\Program Files\Microchip\xc32\v4.60\bin"
-CMSIS_DIR=
 DFP_DIR=C:/Users/lunch/.mchp_packs/Microchip/SAME51_DFP/3.8.253
