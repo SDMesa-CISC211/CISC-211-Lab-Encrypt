@@ -1,7 +1,5 @@
 /*** asmEncrypt.s   ***/
 
-#include <xc.h>
-
 /* Declare the following to be in data memory */
 .data  
 
@@ -85,9 +83,9 @@ where:
 .type asmEncrypt,%function
 asmEncrypt:   
 
+    /* DON'T FORGET TO FOLLOW THE ARM CALLING CONVENTION!  */
+
     /* YOUR asmEncrypt CODE BELOW THIS LINE! VVVVVVVVVVVVVVVVVVVVV  */
-
-
 
     
     /* YOUR asmEncrypt CODE ABOVE THIS LINE! ^^^^^^^^^^^^^^^^^^^^^  */
