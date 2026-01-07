@@ -1,7 +1,5 @@
 /*** asmEncrypt.s   ***/
 
-#include <xc.h>
-
 /* Declare the following to be in data memory */
 .data  
 
@@ -85,20 +83,12 @@ where:
 .type asmEncrypt,%function
 asmEncrypt:   
 
-    /* save the caller's registers, as required by the ARM calling convention */
-    push {r4-r11,LR}
-    
+    /* DON'T FORGET TO FOLLOW THE ARM CALLING CONVENTION!  */
+
     /* YOUR asmEncrypt CODE BELOW THIS LINE! VVVVVVVVVVVVVVVVVVVVV  */
-
-
 
     
     /* YOUR asmEncrypt CODE ABOVE THIS LINE! ^^^^^^^^^^^^^^^^^^^^^  */
-
-    /* restore the caller's registers, as required by the ARM calling convention */
-    pop {r4-r11,LR}
-
-    mov pc, lr	 /* asmEncrypt return to caller */
    
 
 /**********************************************************************/   

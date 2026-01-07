@@ -41,6 +41,11 @@
 #include <malloc.h>
 #include "definitions.h"                // SYS function prototypes
 
+// asm function to get the SP value. Ensures tested code didn't
+// corrupt the SP. Does NOT ensure that the code actually pushed
+// on entry and popped on exit. Need to look at code to ensure that.
+#define GET_REG(XX,YY) asm volatile("mov %0," #XX : "=r"(*YY))
+
 // NOTE: THIS .equ MUST MATCH THE #DEFINE IN main.c !!!!!
 // TODO: create a .h file that handles both C and assembly syntax for this definition
 #define CIPHER_TEXT_LEN 200
@@ -148,15 +153,19 @@ bool testOutOfBoundsWrites( char * asmCipherTextPtr,
 
 // Stores pass/fail counts for this pass at the locations provided by
 // passCount and failCount
-// If both strlen and decrypted contents match: passCount = 2; failCount = 0;
-// If strlen matches and decrypt doesn't, 1 pass, 1 fail
-// if strlen doesn't match, can't compare, so pass = 0, fail = 2
-// if student returns bogus pointer, pass = 0, fail = 2
-// and/or crash
+// Four tests:
+// 1: Pointer points to correct mem location
+// 2: Decrypted strlen equals expected strlen
+// 3: No writes to mem outside of string boundaries
+// 4: Stack pointer not corrupted
+// 
+
 static void testResult(int testNum, 
                       char * origText, 
                       char * asmCipherTextPtr, 
                       uint32_t key,
+                      uint32_t sp_before,
+                      uint32_t sp_after,
                       uint32_t * passCount, // these counters are reset each time
                       uint32_t * failCount) 
 {
@@ -164,6 +173,7 @@ static void testResult(int testNum,
     char *s1 = pass;   // length and ptr are correct
     char *s2 = pass;   // encryption is correct
     char *s3 = pass;   // no out-of-bound write errors in encrypted string buf
+    char *s4 = pass;   // Stack pointer check passed
     uint32_t origLen = strlen(origText);
     uint32_t encryptedLen = strlen(asmCipherTextPtr);
     char *printableDecryptString = 0;
@@ -177,7 +187,7 @@ static void testResult(int testNum,
         *failCount += 1;
         s1 = fail;
         skipDecryption = true;
-        printableDecryptString = "DECRYPTION NOT ATTEMPTED DUE TO POINTER COMPARISON FAIL";
+        printableDecryptString = "DECRYPTION NOT ATTEMPTED DUE TO POINTER COMPARISON FAIL; FAILING ALL TESTS";
     }
     // make sure length of encrypted string matches known-good encrypted text.
     // if it doesn't, set fail count to 2 and don't compare student's decrypted text
@@ -189,7 +199,7 @@ static void testResult(int testNum,
         *failCount += 1;
         s1 = fail;
         skipDecryption = true;
-        printableDecryptString = "DECRYPTION NOT ATTEMPTED DUE TO LENGTH MISMATCH";
+        printableDecryptString = "DECRYPTION NOT ATTEMPTED DUE TO LENGTH MISMATCH; FAILING ALL TESTS";
     }
     else
     {
@@ -252,17 +262,47 @@ static void testResult(int testNum,
 
     }
     
-    bool outOfBoundsWriteDetected = false;
-    outOfBoundsWriteDetected = testOutOfBoundsWrites(asmCipherTextPtr, origLen);
-    
-    if(outOfBoundsWriteDetected == true)
+    // if couldn't decrypt due to length or pointer errors, fail the bounds check test, too
+    if(skipDecryption == true)
     {
-        *failCount += 1;
+        *failCount +=1;
         s3 = fail;
     }
     else
     {
-        *passCount += 1;
+
+        bool outOfBoundsWriteDetected = false;
+        outOfBoundsWriteDetected = testOutOfBoundsWrites(asmCipherTextPtr, origLen);
+        
+        if(outOfBoundsWriteDetected == true)
+        {
+            *failCount += 1;
+            s3 = fail;
+        }
+        else
+        {
+            *passCount += 1;
+        }
+    }
+
+    // if couldn't decrypt due to length or pointer errors, fail the stack ptr check test, too
+    if(skipDecryption == true)
+    {
+        *failCount +=1;
+        s4 = fail;
+    }
+    else
+    {
+        // if before and after stack ptrs don't match, it's a failure
+        if(sp_before != sp_after)
+        {
+            *failCount += 1;
+            s4 = fail;
+        }
+        else
+        {
+            *passCount += 1;
+        }
     }
        
     snprintf((char*)uartTxBuffer, MAX_PRINT_LEN,
@@ -274,17 +314,25 @@ static void testResult(int testNum,
             "decrypted text:                 <%s>\r\n"
             "test case string length:            %ld\r\n"
             "asmEncrypt encrypted string length: %ld\r\n"
+            "Expected and Actual SP: 0x%08lx; 0x%08lx\r\n"
             "test results: \r\n"
             "  RETURNED POINTER AND LENGTH TEST: %s\r\n"
             "             DECRYPTED STRING TEST: %s\r\n"
             "          OUT-OF-BOUNDS WRITE TEST: %s\r\n"
+            "         STACK PTR COMPARISON TEST: %s\r\n"
             "\r\n",
-            testNum,key,
-            origText,asmCipherTextPtr,printableDecryptString,
-            origLen,encryptedLen,
+            testNum,
+            key,
+            origText,
+            asmCipherTextPtr,
+            printableDecryptString,
+            origLen,
+            encryptedLen,
+            sp_before,sp_after,
             s1, 
             s2,
-            s3); 
+            s3,
+            s4); 
 
 #if USING_HW 
     DMAC_ChannelTransfer(DMAC_CHANNEL_0, uartTxBuffer, \
@@ -336,6 +384,9 @@ int main ( void )
     uint32_t totalPassCount = 0;
     uint32_t passCount = 0;
     uint32_t failCount = 0;
+    uint32_t sp1, sp2; // variables to hold the SP values before and after func calls
+    uint32_t *sp1Ptr = &sp1;
+    uint32_t *sp2Ptr = &sp2;
     
     while ( true )
     {
@@ -368,9 +419,12 @@ int main ( void )
                 resetCipherTextBuffer();
                 
                 // encrypt it
+                GET_REG(sp, sp1Ptr); // get SP value before the call
                 asmEncryptedTextPtr = asmEncrypt(inpText,k);
+                GET_REG(sp, sp2Ptr); // get SP value after the call
                                                 
                 testResult(testCaseNum, inpText, asmEncryptedTextPtr, k,
+                        sp1, sp2,
                         &passCount, &failCount);
                 totalFailCount += failCount;
                 totalPassCount += passCount;
