@@ -37,13 +37,15 @@
 # added by VB
 *.elf
 *.hex
-*s~
-*.swp
-*.c~
-/Lab-09-encrypt/firmware/asmEncryptProj.X/build/
-/Lab-09-encrypt/firmware/asmEncryptProj.X/dist/
+build/
+dist/
+*.s~
 *.un~
 *.h~
+*.swp
+*.*~
+.DS_Store
+private/
 
 # added by amilner
 **/build/
