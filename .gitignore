@@ -44,3 +44,10 @@
 /Lab-09-encrypt/firmware/asmEncryptProj.X/dist/
 *.un~
 *.h~
+
+# added by amilner
+**/build/
+**/dist/
+**/nbproject/private/
+**/nbproject/Makefile-*.mk
+**/queuelogs/

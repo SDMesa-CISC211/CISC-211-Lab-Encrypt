@@ -74,7 +74,8 @@ static volatile bool isRTCExpired = false;
 static volatile bool changeTempSamplingRate = false;
 static volatile bool isUSARTTxComplete = true;
 static uint8_t uartTxBuffer[MAX_PRINT_LEN] = {0};
-static uint8_t decryptBuffer[MAX_PRINT_LEN] = {0};
+static uint8_t decryptBuffer[300] = {0};
+static uint8_t origBuffer[300] = {0};
 static char * pass = "PASS";
 static char * fail = "FAIL";
 
@@ -89,16 +90,57 @@ static char * fail = "FAIL";
 // For this lab, return the larger of the two floating point values passed in.
 extern char * asmEncrypt(char *, uint32_t);
 
+typedef struct {
+    int key;
+    char *inputString;
+} TestCase;
+
+TestCase testCases[] = 
+{
+    /* ASCII Uppercase Encryption (A?Z) */
+    { .key = 0, .inputString = "ABCXYZ" },   
+    { .key = 1, .inputString = "ABCXYZ" },
+    { .key = 13, .inputString = "ABCXYZ" },
+    { .key = 25, .inputString = "ABCXYZ" },
+  
+    /* ASCII Lowercase Encryption (a?z) */
+    { .key = 2, .inputString = "abcxyz" },   
+    { .key = 3, .inputString = "abcxyz"},
+    { .key = 14, .inputString = "abcxyz" },
+    { .key = 24, .inputString = "abcxyz" },
+    
+    /* Non-Alphabet ASCII Handling */
+    { .key = 4, .inputString = "4a!b c x5y .z" },
+    
+    /* UTF-8 Multi-byte Handling */
+    { .key = 5, .inputString =  "\xC0\x11" }, // 110xxxxxx
+    { .key = 6, .inputString =  "\xE0\x11\x11" }, // 1110xxxxx
+    { .key = 7, .inputString =  "\xF0\x11\x11\x11" }, // 11110xxx
+    
+    /* Mixed ASCII/UTF-8 Handling */
+    { .key = 8, .inputString =  "I <3 C@tZ\xF0 123" }, // 11110xxx
+    { .key = 9, .inputString =  "UTF8\xC0\x90\xF0XXX" }, // 110xxxxxx
+
+    /* UTF-8 Error Handling */
+    { .key = 10, .inputString = "ABC\x80zz" }
+};
 
 // Different strings to be encrypted during tests
-static char * inpTextArray[] = { "ABCXYZ",
+/*static char * inpTextArray[] = { "KLM\xE0\x90\x90ZZ",
+                                "\x80\x80\x80\x00",
+                             
+                                
+                   
+                                "ABCXYZ",
                                  "abcxyz",
                                  "\"Whoa, really?\", he said.",
                                  "123AbC456!@#$",
                                  ""   // Yes; a test of an empty string!
                                 };
+ */
+
 // Keys to be used for each test
-static uint32_t keyArray[] = {0,1,13,25};
+//static uint32_t keyArray[] = {0,1,13,25};
 
 #define USING_HW 1
 
@@ -189,10 +231,12 @@ static void testResult(int testNum,
         skipDecryption = true;
         printableDecryptString = "DECRYPTION NOT ATTEMPTED DUE TO POINTER COMPARISON FAIL; FAILING ALL TESTS";
     }
+    
+    /* Need to add more logic to be able to test this with UTF8 encoding */
     // make sure length of encrypted string matches known-good encrypted text.
     // if it doesn't, set fail count to 2 and don't compare student's decrypted text
     // to known-good value
-    else if (origLen != encryptedLen)
+    /*else if (origLen != encryptedLen)
     {
         // since we can't compare unequal length strings,
         // we won't even try to decrypt. This counts as two failures
@@ -200,7 +244,7 @@ static void testResult(int testNum,
         s1 = fail;
         skipDecryption = true;
         printableDecryptString = "DECRYPTION NOT ATTEMPTED DUE TO LENGTH MISMATCH; FAILING ALL TESTS";
-    }
+    }*/
     else
     {
         *passCount += 1; // pointer comparison and string lengths were correct.
@@ -227,6 +271,7 @@ static void testResult(int testNum,
         // for(int i = 0; i < origLen; ++i)
         while ( (inpChar = *encCharPtr++) )
         {
+            /* Lowercase ASCII */
             if ((inpChar >= 'a') && (inpChar<='z'))
             {
                 inpChar -= key;
@@ -248,9 +293,57 @@ static void testResult(int testNum,
         }
         *dPtr = 0; // add trailing null
         
+        /* Need to account for UTF-8 chars, since its a lossy translation
+         for UTF-8 we need to modify the origText string to match what the
+         encrypted string characters would produce
+         */
+        /* local pointer to modified original string */
+        char *oBufPtr = (char *)origBuffer;
+        /* loop through the original string */
+        for(char* oTChar = origText; *oTChar != '\0';)
+        {
+            /* 4 byte UTF8 char */
+            if((*oTChar & '\xF0') == '\xF0')
+            {
+                /* update output ptr */
+                *oBufPtr++ = '#';
+                *oBufPtr++ = '4';
+                /* update in buf ptr */
+                oTChar += 4;
+            }
+            /* 3 byte UTF8 char */
+            else if((*oTChar & '\xE0') == '\xE0')
+            {
+                /* update output ptr */
+                *oBufPtr++ = '#';
+                *oBufPtr++ = '3';
+                /* update in buf ptr */
+                oTChar += 3;
+            }            
+            /* 2 byte UTF8 char */
+            else if((*oTChar & '\xC0') == '\xC0')
+            {
+                /* update output ptr */
+                *oBufPtr++ = '#';
+                *oBufPtr++ = '2';
+                /* update in buf ptr */
+                oTChar += 2;
+            }
+            /* malformed UTF-8 */
+            else if((*oTChar & '\x80') == '\x80')
+            {
+                *oBufPtr++ = '*';
+                oTChar++;
+            }
+            else 
+            {
+                *oBufPtr++ = *oTChar++;
+            }
+        }
         // now compare the string we just encrypted to the student's string
         // Check to see that encrypted strings matched.
-        if(strcmp((const char *) decryptBuffer,(const char *)origText) != 0)
+        
+        if(strcmp((const char *) decryptBuffer,(const char *)origBuffer) != 0)
         {
             s2 = fail;
             *failCount += 1;
@@ -310,13 +403,14 @@ static void testResult(int testNum,
             "For clarity, input/output strings enclosed in <>'s\r\n"
             "key: %ld\r\n"
             "test case input text:           <%s>\r\n"
+            "test case input with UTF-8 processing: <%s>\r\n"
             "encrypted text from asmEncrypt: <%s>\r\n"
             "decrypted text:                 <%s>\r\n"
             "test case string length:            %ld\r\n"
             "asmEncrypt encrypted string length: %ld\r\n"
             "Expected and Actual SP: 0x%08lx; 0x%08lx\r\n"
             "test results: \r\n"
-            "  RETURNED POINTER AND LENGTH TEST: %s\r\n"
+            "             RETURNED POINTER TEST: %s\r\n"
             "             DECRYPTED STRING TEST: %s\r\n"
             "          OUT-OF-BOUNDS WRITE TEST: %s\r\n"
             "         STACK PTR COMPARISON TEST: %s\r\n"
@@ -324,6 +418,7 @@ static void testResult(int testNum,
             testNum,
             key,
             origText,
+            (char*)origBuffer,
             asmCipherTextPtr,
             printableDecryptString,
             origLen,
@@ -339,6 +434,9 @@ static void testResult(int testNum,
         (const void *)&(SERCOM5_REGS->USART_INT.SERCOM_DATA), \
         strlen((const char*)uartTxBuffer));
 #endif
+    
+    /* zero out the comparison buffer so we don't get trailing chars*/
+    memset(origBuffer, 0, sizeof(origBuffer));
     // free (decryptedText);
     return ;
     
@@ -375,9 +473,7 @@ int main ( void )
     isUSARTTxComplete = true;
 #endif //SIMULATOR
 
-    uint32_t numKeys = sizeof(keyArray)/sizeof(keyArray[0]);
-    uint32_t numStrings = sizeof(inpTextArray)/sizeof(inpTextArray[0]);
-    // uint32_t numTests = numStrings*numKeys;
+    uint32_t numTests = sizeof(testCases)/sizeof(testCases[0]);
     uint32_t testCaseNum = 0;
     uint32_t totalTestCount = 0;
     uint32_t totalFailCount = 0;
@@ -390,12 +486,9 @@ int main ( void )
     
     while ( true )
     {
-        // select a key
-        for(int keyIndex = 0; keyIndex<numKeys; keyIndex++)
+
+        for(int testNumber = 0; testNumber < numTests; testNumber++)
         {
-            // apply the selected key to each string
-            for(int numString = 0; numString<numStrings; numString++)
-            {
                 // Toggle the LED to show we're running a new testcase
                 LED0_Toggle();
                 
@@ -403,14 +496,14 @@ int main ( void )
                 isRTCExpired = false;
                 isUSARTTxComplete = false;
                 
-                // extract the key from the key array
-                int k = keyArray[keyIndex];
-                
                 // create a variable to store the returned pointer
                 char * asmEncryptedTextPtr;
                 
+                // extract the key
+                int k = testCases[testNumber].key;
+                
                 // select the input text
-                char * inpText = inpTextArray[numString];
+                char * inpText = testCases[testNumber].inputString;
 
                 // Need to reset contents of cipherText buffer
                 // so that test can detect if the encryption function
@@ -437,8 +530,7 @@ int main ( void )
                 while ((isRTCExpired == false) ||
                        (isUSARTTxComplete == false));
 #endif
-            } // for each string...
-        } // for each key
+        } // for each test case
         
         break; // end program
     } // while ...
