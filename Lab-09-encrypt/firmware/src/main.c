@@ -68,7 +68,7 @@ extern uint32_t cipherTextPtr;
 // number of Lab Quiz points for 100% correct test results
 #define NUM_PTS_MAX 40
 
-#define MAX_PRINT_LEN 1000
+#define MAX_PRINT_LEN 3000
 
 static volatile bool isRTCExpired = false;
 static volatile bool changeTempSamplingRate = false;
