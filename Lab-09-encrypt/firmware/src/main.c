@@ -552,7 +552,7 @@ int main ( void )
                 "========= %s: asmEncrypt ALL TESTS COMPLETE!\r\n"
                 "Post-test idle Count: %ld; "
                 "Total Passing Tests: %ld/%ld\r\n"
-                "Score: %ld/%d pts\r\n"
+                "Final Score: %ld/%d pts\r\n"
                 "FINI!!!!!\r\n"
                 "\r\n",
                 (char *) nameStrPtr, idleCount, 
